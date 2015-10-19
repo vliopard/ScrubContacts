@@ -76,6 +76,7 @@ def access(code):
         info = client.GetContacts()
         global user_name
         user_name = info.id.text
+        global direct
 
         print '_'*80
         print '0. List Contacts                    - Test for showing all contacts on screen'
@@ -113,7 +114,6 @@ def access(code):
         if opt == '6':
             read_file('dupeID.txt')
         if opt == '7':
-            global direct
             direct = True
             batch_merge('Name', display_contacts())
         if opt == '8':
@@ -127,7 +127,6 @@ def access(code):
         if opt == 'e':
             batch_merge('Mail', display_contacts())
         if opt == 'f':
-            global direct
             direct = True
             batch_merge('Mail', display_contacts())
         if opt == 'i':
