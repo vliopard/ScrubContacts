@@ -424,8 +424,13 @@ def set_web_label(name, url):
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
-def set_event(name, dt):
-    return gdata.contacts.data.Event(when=gdata.data.When(start=dt), rel=name)
+def set_event_rel(rel, dt):
+    return gdata.contacts.data.Event(when=gdata.data.When(start=dt), rel=rel)
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
+def set_event_label(label, dt):
+    return gdata.contacts.data.Event(when=gdata.data.When(start=dt), label=label)
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
@@ -440,8 +445,13 @@ def make_gender(oc):
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
-def set_relation(okind, name):
-    return gdata.contacts.data.Relation(rel=okind, text=name)
+def set_relation_rel(rel, name):
+    return gdata.contacts.data.Relation(rel=rel, text=name)
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
+def set_relation_label(label, name):
+    return gdata.contacts.data.Relation(label=label, text=name)
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
@@ -544,6 +554,16 @@ def list_feed(feed):
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
+def get_no_format(text):
+    return text
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
+def get_low_format(text):
+    return text.lower()
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
 def get_num_format(number):
     new_num = number
     n = get_num(number)
@@ -595,7 +615,8 @@ def list_contact(contact_entry, paused):
     website_tabs = 61
     phone_tabs = 61
     email_tabs = 50
-    addr_tabs = 40
+    addr_tabs = 61
+    im_tabs = 61
     if contact_entry is not None:
         print '__________________________________________________________'
         var = deep_get_attribute(contact_entry, 'id.text')
@@ -641,7 +662,9 @@ def list_contact(contact_entry, paused):
                    ' '*(website_tabs-len(udf[1])) if len(udf[1]) < website_tabs else ' ',
                    udf[0])
         for udf in contact_entry.im:
-            print '12 IMSG %s:[%s]' % (udf.protocol, udf.address)
+            print '12 IMSG: [%s]%s[%s]' % (udf.protocol,
+                                           ' '*(im_tabs-len(udf.protocol)) if len(udf.protocol) < im_tabs else ' ',
+                                           udf.address)
         for udf in contact_entry.structured_postal_address:
             rel_or_label = udf.rel if udf.rel is not None else udf.label
             print '13 ZIPC: [%s]%s[%s]' % \
@@ -935,6 +958,7 @@ def import_contacts(file_name):
     for line in lines:
         i += 1
         cname, email, phone, account, address, manager, company, department = line.split(';')
+        department = department.rsplit()
         print 'Sequence number [%s/%s]' % (i, max_lines)
 
         new_contact = gdata.contacts.data.ContactEntry()
@@ -1089,11 +1113,77 @@ def merge_contacts_by_phone(contact_keep, contact_remove):
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
+def merge_field(contact_keep, contact_remove, attribute, key, value, function):
+    # TODO: TASK: REMOVE THIS PRINT BELOW
+    print 'mergingf: [%s]' % attribute
+    changed = False
+    c_k = deep_get_attribute(contact_keep, attribute)
+    c_r = deep_get_attribute(contact_remove, attribute)
+    if c_k:
+        for fix in c_k:
+            setattr(fix, value, deep_get_attribute(fix, value).rstrip())
+        user_field = []
+        for uf in c_k:
+            e_k = deep_get_attribute(uf, key)
+            e_v = deep_get_attribute(uf, value)
+            user_field.append(e_k + '|' + e_v)
+        for event_remove in c_r:
+            er_k = deep_get_attribute(event_remove, key)
+            er_v = deep_get_attribute(event_remove, value)
+            check = er_k + '|' + er_v
+            if check not in user_field:
+                c_k.append(getattr(sys.modules[__name__], "%s" % function)(er_k, er_v.rstrip()))
+                changed = True
+    if changed:
+        setattr(contact_keep, attribute, c_k)
+    return contact_keep, changed
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
+def merge_attribute(contact_keep, contact_remove, attribute, value, rel_func, label_func, format_func):
+    # TODO: TASK: REMOVE THIS PRINT BELOW
+    print 'merginga: [%s]' % attribute
+    changed = False
+    c_k = deep_get_attribute(contact_keep, attribute)
+    c_r = deep_get_attribute(contact_remove, attribute)
+    if c_k:
+        c_k_list = []
+        for site_list in c_k:
+            e_k = deep_get_attribute(site_list, value)
+            c_k_list.append((site_list.rel if site_list.rel is not None else site_list.label) + '|' + e_k)
+        for event_remove in c_r:
+            e_r = deep_get_attribute(event_remove, value)
+            check = (event_remove.rel if event_remove.rel is not None else event_remove.label) + '|' + e_r
+            if check not in c_k_list:
+                if event_remove.rel is not None:
+                    c_k.append(getattr(sys.modules[__name__], "%s" % rel_func)(event_remove.rel,
+                                                                               getattr(sys.modules[__name__], "%s" % format_func)(e_r)))
+                else:
+                    c_k.append(getattr(sys.modules[__name__], "%s" % label_func)(event_remove.label,
+                                                                                 getattr(sys.modules[__name__], "%s" % format_func)(e_r)))
+                changed = True
+    else:
+        if c_r:
+            c_k = []
+            for event_remove in c_r:
+                e_r = deep_get_attribute(event_remove, value)
+                if event_remove.rel is not None:
+                    c_k.append(getattr(sys.modules[__name__], "%s" % rel_func)(event_remove.rel,
+                                                                               getattr(sys.modules[__name__], "%s" % format_func)(e_r)))
+                else:
+                    c_k.append(getattr(sys.modules[__name__], "%s" % label_func)(event_remove.label,
+                                                                                 getattr(sys.modules[__name__], "%s" % format_func)(e_r)))
+                changed = True
+    if changed:
+        setattr(contact_keep, attribute, c_k)
+    return contact_keep, changed
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
 def merge_contacts_by_name(contact_keep, contact_remove):
     global client
     global direct
     same_name_email = False
-    something_changed = False
     what_changed = []
 
     if deep_get_attribute(contact_keep, 'name.full_name.text') == \
@@ -1121,11 +1211,9 @@ def merge_contacts_by_name(contact_keep, contact_remove):
             if item_two != 'empty':
                 if item_one != 'empty':
                     contact_keep.content.text = item_one + '\n_______\n' + item_two
-                    something_changed = True
                     what_changed.append('18.NOTE(merge)')
                 else:
                     contact_keep.content.text = item_two
-                    something_changed = True
                     what_changed.append('18.NOTE')
 
         # TODO: TASK: * JOB DESCRIPTION, * OCCUPATION, * GENDER
@@ -1134,7 +1222,6 @@ def merge_contacts_by_name(contact_keep, contact_remove):
         #                           'gender')
         # if temp_gender.value != deep_get_attribute(contact_keep, 'gender.value'):
         #     contact_keep.gender = set_gender(temp_gender.value)
-        #     something_changed = True
         #     what_changed.append(
         #         '21.GNDR: [' + deep_get_attribute(contact_keep, 'gender.value') + '] => [' + temp_gender.value + ']')
 
@@ -1142,17 +1229,16 @@ def merge_contacts_by_name(contact_keep, contact_remove):
                                 deep_get_attribute(contact_remove, 'nickname.text'),
                                 'nick')
         if temp_nick.text != deep_get_attribute(contact_keep, 'nickname.text'):
+            tmp_print = deep_get_attribute(contact_keep, 'nickname.text')
             contact_keep.nickname = temp_nick
-            something_changed = True
             what_changed.append(
-                '02.NICK: [' + deep_get_attribute(contact_keep, 'nickname.text') + '] => [' + temp_nick.text + ']')
+                '02.NICK: [' + tmp_print + '] => [' + temp_nick.text + ']')
 
         temp_title = undupe_item(deep_get_attribute(contact_keep, 'title.text'),
                                  deep_get_attribute(contact_remove, 'title.text'),
                                  'title')
         if temp_title.text != deep_get_attribute(contact_keep, 'title.text'):
             contact_keep.title = temp_title
-            something_changed = True
             what_changed.append(
                 '03.TITL: [' + deep_get_attribute(contact_keep, 'title.text') + '] => [' + temp_title.text + ']')
 
@@ -1170,12 +1256,10 @@ def merge_contacts_by_name(contact_keep, contact_remove):
         if (org_name.text != 'empty') and \
                 (org_name.text != deep_get_attribute(contact_keep, 'organization.name.text')):
             contact_keep.organization.name = org_name
-            something_changed = True
             what_changed.append('05.ORGN')
         if (org_title.text != 'empty') and \
                 (org_title.text != deep_get_attribute(contact_keep, 'organization.title.text')):
             contact_keep.organization.title = org_title
-            something_changed = True
             what_changed.append('06.ORGT')
 
         b_day = undupe_item(deep_get_attribute(contact_keep, 'birthday.when'),
@@ -1184,205 +1268,80 @@ def merge_contacts_by_name(contact_keep, contact_remove):
         if b_day is not None:
             if b_day.when != deep_get_attribute(contact_keep, 'birthday.when'):
                 contact_keep.birthday = b_day
-                something_changed = True
                 what_changed.append('07.BRTH')
 
         group = False
+        # TODO: TASK: CHANGE TO DYNAMIC GENERIC MERGING FUNCTION
         for group_keep in contact_keep.group_membership_info:
             for group_remove in contact_remove.group_membership_info:
                 if group_keep.href != group_remove.href:
+                    ### contact_keep.group_membership_info.append(set_group(group_remove.href))
                     group_keep.append(set_group(group_remove.href))
                     group = True
         if group:
-            something_changed = True
             what_changed.append('19.GRPS')
 
-        event = False
-        for event_keep in contact_keep.event:
-            for event_remove in contact_remove.event:
-                if event_remove.rel is not None:
-                    if event_keep.rel != event_remove.rel:
-                        event_keep.append(set_event(event_remove.rel, event_remove.when.start))
-                        event = True
-                else:
-                    if event_keep.label != event_remove.label:
-                        event_keep.append(set_event(event_remove.label, event_remove.when.start))
-                        event = True
+        contact_keep, event = merge_attribute(contact_keep, contact_remove, 'event', 'when.start',
+                                              'set_event_rel', 'set_event_label', 'get_no_format')
         if event:
-            something_changed = True
             what_changed.append('08.EVNT')
 
-        relation = False
-        for event_keep in contact_keep.relation:
-            for event_remove in contact_remove.relation:
-                if event_remove.rel is not None:
-                    if event_keep.rel != event_remove.rel:
-                        event_keep.append(set_relation(event_remove.rel, event_remove.text))
-                        relation = True
-                else:
-                    if event_keep.label != event_remove.label:
-                        event_keep.append(set_relation(event_remove.label, event_remove.text))
-                        relation = True
+        contact_keep, relation = merge_attribute(contact_keep, contact_remove, 'relation', 'text',
+                                                 'set_relation_rel', 'set_relation_label', 'get_no_format')
         if relation:
-            something_changed = True
             what_changed.append('10.RELT')
 
-        ws = False
-        if contact_keep.website:
-            website = []
-            for site_list in contact_keep.website:
-                website.append((site_list.rel if site_list.rel is not None else site_list.label) + '|' + site_list.href)
-            for event_remove in contact_remove.website:
-                check = (event_remove.rel if event_remove.rel is not None else event_remove.label) +\
-                        '|' + event_remove.href
-                if check not in website:
-                    if event_remove.rel is not None:
-                        contact_keep.website.append(set_web_rel(event_remove.rel, event_remove.href))
-                    else:
-                        contact_keep.website.append(set_web_label(event_remove.label, event_remove.href))
-                    ws = True
-        else:
-            if contact_remove.website:
-                contact_keep.website = []
-                for event_remove in contact_remove.website:
-                    if event_remove.rel is not None:
-                        contact_keep.website.append(set_web_rel(event_remove.rel, event_remove.href))
-                    else:
-                        contact_keep.website.append(set_web_label(event_remove.label, event_remove.href))
-                    ws = True
+        contact_keep, ws = merge_attribute(contact_keep, contact_remove, 'website', 'href',
+                                           'set_web_rel', 'set_web_label', 'get_no_format')
         if ws:
-            something_changed = True
             what_changed.append('11.WEBS')
 
-        em = False
-        if contact_keep.email:
-            email = []
-            for email_list in contact_keep.email:
-                email.append(email_list.address)
-            for event_remove in contact_remove.email:
-                if event_remove.address not in email:
-                    if event_remove.rel is not None:
-                        contact_keep.email.append(set_email_rel(event_remove.rel, event_remove.address.lower()))
-                    else:
-                        contact_keep.email.append(set_email_label(event_remove.label, event_remove.address.lower()))
-                    em = True
-        else:
-            if contact_remove.email:
-                contact_keep.email = []
-                for event_remove in contact_remove.email:
-                    if event_remove.rel is not None:
-                        contact_keep.email.append(set_email_rel(event_remove.rel, event_remove.address.lower()))
-                    else:
-                        contact_keep.email.append(set_email_label(event_remove.label, event_remove.address.lower()))
-                    em = True
+        contact_keep, em = merge_attribute(contact_keep, contact_remove, 'email', 'address',
+                                           'set_email_rel', 'set_email_label', 'get_low_format')
         if em:
-            something_changed = True
             what_changed.append('14.MAIL')
 
-        ph = False
-        if contact_keep.phone_number:
-            number = []
-            for number_list in contact_keep.phone_number:
-                number.append((number_list.rel if number_list.rel is not None else number_list.label) +
-                              '|' + get_num(number_list.text))
-            for event_remove in contact_remove.phone_number:
-                check = (event_remove.rel if event_remove.rel is not None else event_remove.label) + \
-                        '|' + get_num(event_remove.text)
-                if check not in number:
-                    if event_remove.rel is not None:
-                        contact_keep.phone_number.append(
-                            set_phone_rel_type(event_remove.rel, get_num_format(event_remove.text)))
-                    else:
-                        contact_keep.phone_number.append(
-                            set_phone_label_type(event_remove.label, get_num_format(event_remove.text)))
-                    ph = True
-        else:
-            if contact_remove.phone_number:
-                contact_keep.phone_number = []
-                for event_remove in contact_remove.phone_number:
-                    if event_remove.rel is not None:
-                        contact_keep.phone_number.append(
-                            set_phone_rel_type(event_remove.rel, get_num_format(event_remove.text)))
-                    else:
-                        contact_keep.phone_number.append(
-                            set_phone_label_type(event_remove.label, get_num_format(event_remove.text)))
-                    ph = True
+        contact_keep, ph = merge_attribute(contact_keep, contact_remove, 'phone_number', 'text',
+                                           'set_phone_rel_type', 'set_phone_label_type', 'get_num_format')
         if ph:
-            something_changed = True
             what_changed.append('15.PHNE')
 
         # TODO: TASK: HANDLE POSTAL ADDRESS TO BE ADDED TO THE CONTACT WHILE MERGING
-        pa = False
-        if contact_keep.structured_postal_address:
-            for event_keep in contact_keep.structured_postal_address:
-                for event_remove in contact_remove.structured_postal_address:
-                    if event_remove.rel is not None:
-                        if event_keep.rel != event_remove.rel and \
-                                        event_keep.formatted_address.text != event_remove.formatted_address.text:
-                            event_keep.append(
-                                set_postal_rel_short(event_remove.rel, event_remove.formatted_address.text))
-                            pa = True
-                    else:
-                        if event_keep.label != event_remove.label and \
-                                        event_keep.formatted_address.text != event_remove.formatted_address.text:
-                            event_keep.append(
-                                set_postal_label_short(event_remove.label, event_remove.formatted_address.text))
-                            pa = True
-        else:
-            contact_keep.structured_postal_address = []
-            if contact_remove.structured_postal_address:
-                for event_remove in contact_remove.structured_postal_address:
-                    if event_remove.rel is not None:
-                        contact_keep.structured_postal_address.append(
-                            set_postal_rel_short(event_remove.rel, event_remove.formatted_address.text))
-                    else:
-                        contact_keep.structured_postal_address.append(
-                            set_postal_label_short(event_remove.label, event_remove.formatted_address.text))
-                    pa = True
+        contact_keep, pa = merge_attribute(contact_keep, contact_remove,
+                                           'structured_postal_address', 'formatted_address.text',
+                                           'set_postal_rel_short', 'set_postal_label_short', 'get_no_format')
         if pa:
-            something_changed = True
             what_changed.append('13.ZIPC')
 
-        ud = False
-        for event_keep in contact_keep.user_defined_field:
-            for event_remove in contact_remove.user_defined_field:
-                if (event_keep.key != event_remove.key) and (event_keep.value != event_remove.value):
-                    event_keep.append(set_custom(event_remove.key, event_remove.value))
-                    ud = True
+        contact_keep, ud = merge_field(contact_keep, contact_remove, 'user_defined_field', 'key', 'value', 'set_custom')
         if ud:
-            something_changed = True
             what_changed.append('09.USER')
 
-        im = False
-        for event_keep in contact_keep.im:
-            for event_remove in contact_remove.im:
-                if (event_keep.protocol != event_remove.protocol) and (event_keep.address != event_remove.address):
-                    event_keep.append(set_messenger(event_remove.address, event_remove.protocol))
-                    im = True
+        contact_keep, im = merge_field(contact_keep, contact_remove, 'im', 'address', 'protocol', 'set_messenger')
         if im:
-            something_changed = True
             what_changed.append('12.IMSG')
 
         # TODO: TASK: SEE IF PHOTO MUST BE HANDLED
         lk = False
+        # TODO: TASK: CHANGE TO DYNAMIC GENERIC MERGING FUNCTION
         for event_keep in contact_keep.link:
             for event_remove in contact_remove.link:
                 if (event_keep.rel != event_remove.rel) and (event_keep.href != event_remove.href):
                     if event_remove.rel != 'self' and event_remove.rel != 'edit':
+                        ### contact_keep.link.append(set_web_rel(event_remove.rel, event_remove.href))
                         event_keep.append(set_web_rel(event_remove.rel, event_remove.href))
                         lk = True
         if lk:
-            something_changed = True
             what_changed.append('16.LINK')
 
         list_contact(contact_keep, False)
-        if something_changed:
-            print 'CHANGED FIELDS TO THIS CONTACT: %s' % what_changed
+        if what_changed:
+            print 'CHANGED FIELDS TO THIS CONTACT:\n %s' % what_changed
         else:
             print '[NO CHANGES]: 2nd contact have less or same items.'
         if not direct:
             debug("|>|>|> It seems everything is ok... Update?")
-        if something_changed:
+        if what_changed:
             updated = change_contact(contact_keep)
             print 'Updated: [%s]' % updated.updated.text
             # if sleep_on:
@@ -1633,8 +1592,8 @@ def create_contact():
     new_contact.organization.job_description = set_job('My Job Description')
     new_contact.gender = set_gender('male')
     new_contact.website.append(set_web_rel('profile', 'www.my_url.com'))
-    new_contact.relation.append(set_relation('brother', 'My Brother'))
-    new_contact.event.append(set_event('anniversary', '2009-09-09'))
+    new_contact.relation.append(set_relation_rel('brother', 'My Brother'))
+    new_contact.event.append(set_event_rel('anniversary', '2009-09-09'))
     new_contact.organization = set_org('Work', 'true', 'My Company', 'My Role')
     new_contact.name = set_name('My Name')
     new_contact.content = set_note('My Note')
