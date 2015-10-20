@@ -214,6 +214,18 @@ def clear():
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
+def wait():
+    time.sleep(3)
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
+def right(val):
+    if '#' in val:
+        return val[(len(val)-val.rfind('#')-1)*-1:].lower()
+    return val.lower()
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
 def bye():
     sys.exit()
 
@@ -1113,9 +1125,28 @@ def merge_contacts_by_phone(contact_keep, contact_remove):
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
+def merge_item(contact_keep, contact_remove, attribute, value, function):
+    changed = False
+    c_k = deep_get_attribute(contact_keep, attribute)
+    c_r = deep_get_attribute(contact_remove, attribute)
+    if c_k:
+        for fix in c_k:
+            setattr(fix, value, deep_get_attribute(fix, value).rstrip())
+        user_field = []
+        for uf in c_k:
+            user_field.append(deep_get_attribute(uf, value))
+        for event_remove in c_r:
+            check = deep_get_attribute(event_remove, value)
+            if check not in user_field:
+                c_k.append(getattr(sys.modules[__name__], "%s" % function)(check.rstrip()))
+                changed = True
+    if changed:
+        setattr(contact_keep, attribute, c_k)
+    return contact_keep, changed
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
 def merge_field(contact_keep, contact_remove, attribute, key, value, function):
-    # TODO: TASK: REMOVE THIS PRINT BELOW
-    print 'mergingf: [%s]' % attribute
     changed = False
     c_k = deep_get_attribute(contact_keep, attribute)
     c_r = deep_get_attribute(contact_remove, attribute)
@@ -1130,7 +1161,7 @@ def merge_field(contact_keep, contact_remove, attribute, key, value, function):
         for event_remove in c_r:
             er_k = deep_get_attribute(event_remove, key)
             er_v = deep_get_attribute(event_remove, value)
-            check = er_k + '|' + er_v
+            check = er_k + '|' + er_v.rstrip()
             if check not in user_field:
                 c_k.append(getattr(sys.modules[__name__], "%s" % function)(er_k, er_v.rstrip()))
                 changed = True
@@ -1141,8 +1172,6 @@ def merge_field(contact_keep, contact_remove, attribute, key, value, function):
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
 def merge_attribute(contact_keep, contact_remove, attribute, value, rel_func, label_func, format_func):
-    # TODO: TASK: REMOVE THIS PRINT BELOW
-    print 'merginga: [%s]' % attribute
     changed = False
     c_k = deep_get_attribute(contact_keep, attribute)
     c_r = deep_get_attribute(contact_remove, attribute)
@@ -1150,17 +1179,19 @@ def merge_attribute(contact_keep, contact_remove, attribute, value, rel_func, la
         c_k_list = []
         for site_list in c_k:
             e_k = deep_get_attribute(site_list, value)
-            c_k_list.append((site_list.rel if site_list.rel is not None else site_list.label) + '|' + e_k)
+            c_k_list.append(right(site_list.rel if site_list.rel is not None else site_list.label) + '|' + e_k)
         for event_remove in c_r:
             e_r = deep_get_attribute(event_remove, value)
-            check = (event_remove.rel if event_remove.rel is not None else event_remove.label) + '|' + e_r
+            check = right(event_remove.rel if event_remove.rel is not None else event_remove.label) + '|' + e_r
             if check not in c_k_list:
                 if event_remove.rel is not None:
                     c_k.append(getattr(sys.modules[__name__], "%s" % rel_func)(event_remove.rel,
-                                                                               getattr(sys.modules[__name__], "%s" % format_func)(e_r)))
+                                                                               getattr(sys.modules[__name__], "%s" %
+                                                                                       format_func)(e_r)))
                 else:
                     c_k.append(getattr(sys.modules[__name__], "%s" % label_func)(event_remove.label,
-                                                                                 getattr(sys.modules[__name__], "%s" % format_func)(e_r)))
+                                                                                 getattr(sys.modules[__name__], "%s" %
+                                                                                         format_func)(e_r)))
                 changed = True
     else:
         if c_r:
@@ -1169,10 +1200,12 @@ def merge_attribute(contact_keep, contact_remove, attribute, value, rel_func, la
                 e_r = deep_get_attribute(event_remove, value)
                 if event_remove.rel is not None:
                     c_k.append(getattr(sys.modules[__name__], "%s" % rel_func)(event_remove.rel,
-                                                                               getattr(sys.modules[__name__], "%s" % format_func)(e_r)))
+                                                                               getattr(sys.modules[__name__], "%s" %
+                                                                                       format_func)(e_r)))
                 else:
                     c_k.append(getattr(sys.modules[__name__], "%s" % label_func)(event_remove.label,
-                                                                                 getattr(sys.modules[__name__], "%s" % format_func)(e_r)))
+                                                                                 getattr(sys.modules[__name__], "%s" %
+                                                                                         format_func)(e_r)))
                 changed = True
     if changed:
         setattr(contact_keep, attribute, c_k)
@@ -1270,17 +1303,6 @@ def merge_contacts_by_name(contact_keep, contact_remove):
                 contact_keep.birthday = b_day
                 what_changed.append('07.BRTH')
 
-        group = False
-        # TODO: TASK: CHANGE TO DYNAMIC GENERIC MERGING FUNCTION
-        for group_keep in contact_keep.group_membership_info:
-            for group_remove in contact_remove.group_membership_info:
-                if group_keep.href != group_remove.href:
-                    ### contact_keep.group_membership_info.append(set_group(group_remove.href))
-                    group_keep.append(set_group(group_remove.href))
-                    group = True
-        if group:
-            what_changed.append('19.GRPS')
-
         contact_keep, event = merge_attribute(contact_keep, contact_remove, 'event', 'when.start',
                                               'set_event_rel', 'set_event_label', 'get_no_format')
         if event:
@@ -1321,22 +1343,25 @@ def merge_contacts_by_name(contact_keep, contact_remove):
         if im:
             what_changed.append('12.IMSG')
 
+        contact_keep, group = merge_item(contact_keep, contact_remove, 'group_membership_info', 'href', 'set_group')
+        if group:
+            what_changed.append('19.GRPS')
+
         # TODO: TASK: SEE IF PHOTO MUST BE HANDLED
-        lk = False
-        # TODO: TASK: CHANGE TO DYNAMIC GENERIC MERGING FUNCTION
-        for event_keep in contact_keep.link:
-            for event_remove in contact_remove.link:
-                if (event_keep.rel != event_remove.rel) and (event_keep.href != event_remove.href):
-                    if event_remove.rel != 'self' and event_remove.rel != 'edit':
-                        ### contact_keep.link.append(set_web_rel(event_remove.rel, event_remove.href))
-                        event_keep.append(set_web_rel(event_remove.rel, event_remove.href))
-                        lk = True
-        if lk:
-            what_changed.append('16.LINK')
+        # lk = False
+        # for event_keep in contact_keep.link:
+        #     for event_remove in contact_remove.link:
+        #         if (event_keep.rel != event_remove.rel) and (event_keep.href != event_remove.href):
+        #             if event_remove.rel != 'self' and event_remove.rel != 'edit':
+        #                 ### contact_keep.link.append(set_web_rel(event_remove.rel, event_remove.href))
+        #                 event_keep.append(set_web_rel(event_remove.rel, event_remove.href))
+        #                 lk = True
+        # if lk:
+        #     what_changed.append('16.LINK')
 
         list_contact(contact_keep, False)
         if what_changed:
-            print 'CHANGED FIELDS TO THIS CONTACT:\n %s' % what_changed
+            print 'CHANGED FIELDS TO THIS CONTACT:\n%s' % what_changed
         else:
             print '[NO CHANGES]: 2nd contact have less or same items.'
         if not direct:
@@ -1345,7 +1370,7 @@ def merge_contacts_by_name(contact_keep, contact_remove):
             updated = change_contact(contact_keep)
             print 'Updated: [%s]' % updated.updated.text
             # if sleep_on:
-            time.sleep(3)  # This is to avoid etag mismatch when google is slow to update contact
+            wait()  # This is to avoid etag mismatch when google is slow to update contact
         else:
             print "|> |> |>  No changes made the original contact. Does not need to update. <| <| <|"
         remove_contact(contact_remove)
@@ -1404,7 +1429,7 @@ def batch_rename_from_list(feed):
                 updated = change_contact(contact_entry)
                 print 'Updated: [%s]' % updated.updated.text
                 # if sleep_on:
-                time.sleep(3)  # This is to avoid etag mismatch when google is slow to update contact
+                wait()  # This is to avoid etag mismatch when google is slow to update contact
     rf.close()
 
 
@@ -1424,7 +1449,7 @@ def batch_rename(feed, old, new):
             updated = change_contact(contact_entry)
             print 'Updated: [%s]' % updated.updated.text
             # if sleep_on:
-            time.sleep(3)  # This is to avoid etag mismatch when google is slow to update contact
+            wait()  # This is to avoid etag mismatch when google is slow to update contact
 
 
 # FORMAT ALL PHONE NUMBERS FROM ALL CONTACTS
@@ -1477,7 +1502,7 @@ def batch_format_phones(feed):
             print 'Updated: [%s]' % updated.updated.text
             phone_changed = False
             # if sleep_on:
-            time.sleep(2)  # This is to avoid etag mismatch when google is slow to update contact
+            wait()  # This is to avoid etag mismatch when google is slow to update contact
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
