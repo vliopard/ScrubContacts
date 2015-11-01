@@ -32,7 +32,7 @@ render = web.template.render('templates/')
 USER_AGENT = 'ScrubContacts'
 
 settings = open('settings.cfg')
-# TODO: TASK: CHECK CLIENT_SECRET DOES NOT HAVE \N AT ITS EOL
+# TODO: TASK: CHECK SUCCESS URL DOES NOT HAVE \N AT ITS EOL
 APPLICATION_REDIRECT_URI, CLIENT_ID, CLIENT_SECRET, SUCCESS = settings.readline().split(',')
 settings.close()
 
@@ -51,6 +51,7 @@ auth_token = gdata.gauth.OAuth2Token(client_id=CLIENT_ID,
                                      user_agent=USER_AGENT)
 authorize_url = auth_token.generate_authorize_url(redirect_uri=APPLICATION_REDIRECT_URI)
 client = gdata.contacts.client.ContactsClient()
+# updated_contact = gdata.contacts.data.ContactEntry()
 direct = False
 feed_count = 0
 max_result = 30000
@@ -88,10 +89,13 @@ def access(code):
         print '6. Write Contacts to File Report    - Same as List Contacts on screen but in disk'
         print '7. Merge prototype name DIRECT      - Non Supervisioned merge process with name'
         print '8. Format Phones                    - Format all phones from the contact list'
+        # TODO: TASK: FORMAT EMAIL LOWER CASE
         print '9. Batch Rename                     - Rename all contacts from OldName to NewName'
         print 'A. Batch Rename from bulk name list - Rename all contacts based on a list [old,new]'
         print 'E. Merge prototype mail             - Supervisioned merge process with email'
         print 'F. Merge prototype mail DIRECT      - Non Supervisioned merge process with email'
+        # TODO: TASK: MERGE PHONE
+        # TODO: TASK: MERGE PHONE DIRECT
         print 'I. Import contacts                  - Import contacts from file'
         print 'X. Delete all contacts              - Remove all contacts from account'
         print '_'*80
@@ -181,8 +185,12 @@ def get_contact_uid(contact_url):
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
 def change_contact(contact_entry):
     try:
-        updated_contact = client.Update(contact_entry)
-        return updated_contact
+        # print '_'*50
+        # print 'DBG: before change: %s' % deep_get_attribute(contact_entry, 'etag')
+        contact_entry = client.Update(contact_entry)
+        # print 'DBG: after change:  %s' % deep_get_attribute(contact_entry, 'etag')
+        # print '-'*50
+        return contact_entry
     except gdata.client.RequestError, e:
         error_status(e, contact_entry.id.text)
     pass
@@ -215,7 +223,8 @@ def clear():
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
 def wait():
-    time.sleep(3)
+    time.sleep(5)
+    return
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
@@ -634,9 +643,9 @@ def list_contact(contact_entry, paused):
         var = deep_get_attribute(contact_entry, 'id.text')
         if var != 'empty':
             print '17 MAIN: [%s]' % (cplus_url + var.rstrip().rsplit('/', 1)[-1])
-        # var = deep_get_attribute(contact_entry, 'etag')
-        # if var != 'empty':
-        #     print '01 ETAG:[%s]' % var
+        var = deep_get_attribute(contact_entry, 'etag')
+        if var != 'empty':
+            print '01 ETAG: [%s]' % var
         var = deep_get_attribute(contact_entry, 'nickname.text')
         if var != 'empty':
             print '02 NICK: [%s]' % var
@@ -894,14 +903,15 @@ def update_contact_name(contact_url, name):
                             contact_entry.birthday.when = ''
                 # contact_entry.name.given_name.text = 'New'
                 # contact_entry.name.family_name.text = 'Name'
-                updated_contact = change_contact(contact_entry)
-                print 'Updated:  [%s]' % updated_contact.updated.text
+                global updated_contact
+                updated_contact  = change_contact(contact_entry)
+                print 'Updated:  [%s]' % updated_contact .updated.text
                 print '=============================================================================='
-                print 'New Name: [%s]' % updated_contact.name.full_name.text
+                print 'New Name: [%s]' % updated_contact .name.full_name.text
                 if changed:
                     print 'New Date: [%s]' % contact_entry.birthday.when
                 print 'Elapsed time %s' % (time.time() - start_time)
-                return updated_contact
+                return updated_contact 
         else:
             print 'Identical, next...'
     return None
@@ -1022,18 +1032,27 @@ def batch_merge(column, feed):
     print 'List Total [%s]' % feed_count
     i = 0
     m = 0
+    # no_next = False
     main_comp = lines[0].rstrip()
     for line in lines:
         i += 1
         # update_contact_name(line)
-
+        # if no_next:
+        #     global updated_contact
+        #     contact_entry1 = updated_contact
+        # else:
+        # TODO: TASK: SYNCHRONIZE GET CONTACT_1 AND CONTACT_2 (1)
         contact_entry1 = get_contact(main_comp)
         if contact_entry1 is not None:
             f_name1 = deep_get_attribute(contact_entry1, 'name.full_name.text')
+            # TODO: TASK: SYNCHRONIZE GET CONTACT_1 AND CONTACT_2 (2)
             contact_entry2 = get_contact(lines[i].rstrip())
             if contact_entry2 is not None:
                 f_name2 = deep_get_attribute(contact_entry2, 'name.full_name.text')
                 if f_name1 == f_name2:
+                    # print '_'*50
+                    # print 'DBG: after merge 2: %s' % deep_get_attribute(contact_entry1, 'etag')
+                    # print '-'*50
                     print '\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n VVVVVVVV ==== NEW COMPARISON STARTS HERE ==== VVVVVVVV'
                     list_contact(contact_entry1, False)
                     list_contact(contact_entry2, False)
@@ -1046,12 +1065,21 @@ def batch_merge(column, feed):
                         # TODO: TASK: MERGE CONTACTS BY PHONE (UNDUPE NAME 1, 2 OR VALUE)
                         merge_contacts_by_phone(contact_entry1, contact_entry2)
                     else:
+                        # print '_'*50
+                        # print 'DBG: before merge: %s' % deep_get_attribute(contact_entry1, 'etag')
                         merge_contacts_by_name(contact_entry1, contact_entry2)
+                        # print 'DBG: after merge 1: %s' % deep_get_attribute(contact_entry1, 'etag')
+                        # print '-'*50
+                        # if merge_contacts_by_name(contact_entry1, contact_entry2):
+                        #     no_next = True
+                        # TODO: TASK: [[[ DO NOT GO TO THE NEXT LINE ]]] <|===== ???
                 else:
                     m = i
+                    # no_next = False
                     main_comp = lines[i].rstrip()
         else:
             m = i - 1
+            # no_next = False
             main_comp = line.rstrip()
     # f.close()
 
@@ -1087,19 +1115,44 @@ def set_value(kind, value):
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
+def undupe_date(date1, date2):
+    # TODO: TASK: TEST THIS BEFORE USE !!!!!!!
+    if is_valid_date(date1) or is_valid_date(date2):
+        if date1[-5:] == date2[-5:]:
+            if get_num(date1[:2]) > 18:
+                print '\n\n'
+                print '|'*60
+                print 'DBG: SELECTED [%s] %s' % (date1, date2)
+                print '|'*60
+                print '\n\n'
+                return date1
+            print '\n\n'
+            print '|'*60
+            print 'DBG: SELECTED %s [%s]' % (date1, date2)
+            print '|'*60
+            print '\n\n'
+            return date2
+    return 'empty'
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
 def undupe_item(item_one, item_two, kind):
     item_one = item_one.strip()
     item_two = item_two.strip()
     if item_one != item_two:
         if item_two != 'empty' and item_two != '':
             if item_one != 'empty' and item_one != '':
-                print '1. %s' % item_one
-                print '2. %s' % item_two
-                answer = raw_input('1, 2 or new value: ')
-                if answer == '2':
-                    item_one = item_two
-                elif answer != '1':
-                    item_one = answer
+                value = undupe_date(item_one, item_two)
+                if value != 'empty':
+                    item_one = value
+                else:
+                    print '1. %s' % item_one
+                    print '2. %s' % item_two
+                    answer = raw_input('1, 2 or new value: ')
+                    if answer == '2':
+                        item_one = item_two
+                    elif answer != '1':
+                        item_one = answer
             else:
                 item_one = item_two
     return set_value(kind, item_one)
@@ -1216,6 +1269,7 @@ def merge_attribute(contact_keep, contact_remove, attribute, value, rel_func, la
 def merge_contacts_by_name(contact_keep, contact_remove):
     global client
     global direct
+    uc = False
     same_name_email = False
     what_changed = []
 
@@ -1367,8 +1421,12 @@ def merge_contacts_by_name(contact_keep, contact_remove):
         if not direct:
             debug("|>|>|> It seems everything is ok... Update?")
         if what_changed:
-            updated = change_contact(contact_keep)
-            print 'Updated: [%s]' % updated.updated.text
+            # TODO: TASK: ETAGS MISMATCH (REUSE updated) VVVVVVVV
+            global updated_contact
+            updated_contact = change_contact(contact_keep)
+            # TODO: TASK: ETAGS MISMATCH (REUSE updated) ^^^^^^
+            print 'Updated: [%s]' % updated_contact.updated.text
+            uc = True
             # if sleep_on:
             wait()  # This is to avoid etag mismatch when google is slow to update contact
         else:
@@ -1376,6 +1434,7 @@ def merge_contacts_by_name(contact_keep, contact_remove):
         remove_contact(contact_remove)
     else:
         print 'Contacts are not the same (not same e-mail, not same profile link)...'
+    return uc
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
@@ -1426,8 +1485,9 @@ def batch_rename_from_list(feed):
                 print 'OLD NAME:[%s]' % contact_entry.name.full_name.text
                 contact_entry.name.full_name.text = contact_entry.name.full_name.text.replace(old, new)
                 print 'NEW NAME:[%s]' % contact_entry.name.full_name.text
-                updated = change_contact(contact_entry)
-                print 'Updated: [%s]' % updated.updated.text
+                global updated_contact
+                updated_contact = change_contact(contact_entry)
+                print 'Updated: [%s]' % updated_contact.updated.text
                 # if sleep_on:
                 wait()  # This is to avoid etag mismatch when google is slow to update contact
     rf.close()
@@ -1446,8 +1506,9 @@ def batch_rename(feed, old, new):
             print 'OLD NAME:[%s]' % contact_entry.name.full_name.text
             contact_entry.name.full_name.text = contact_entry.name.full_name.text.replace(old, new)
             print 'NEW NAME:[%s]' % contact_entry.name.full_name.text
-            updated = change_contact(contact_entry)
-            print 'Updated: [%s]' % updated.updated.text
+            global updated_contact
+            updated_contact = change_contact(contact_entry)
+            print 'Updated: [%s]' % updated_contact.updated.text
             # if sleep_on:
             wait()  # This is to avoid etag mismatch when google is slow to update contact
 
@@ -1498,8 +1559,9 @@ def batch_format_phones(feed):
                 print 'PHNE: [%s]%s[%s]' % (udf.text,
                                             ' '*(phone_tabs-len(udf.text)) if len(udf.text) < phone_tabs else ' ',
                                             udf.rel if udf.rel is not None else udf.label)
-            updated = change_contact(contact_entry)
-            print 'Updated: [%s]' % updated.updated.text
+            global updated_contact
+            updated_contact = change_contact(contact_entry)
+            print 'Updated: [%s]' % updated_contact.updated.text
             phone_changed = False
             # if sleep_on:
             wait()  # This is to avoid etag mismatch when google is slow to update contact
