@@ -1102,22 +1102,31 @@ def set_value(kind, value):
             # return set_birth(new_date)
             return None
         if is_valid_date(value) is not True:
-            last_five = value[-5:]
-            test_number = int(last_five[:2])
-            if test_number <= 12:
-                new_date = '1900-' + last_five[:2] + '-' + value[-2:]
-            else:
-                new_date = '1900-' + value[-2:] + '-' + last_five[:2]
-            if is_valid_date(new_date):
-                return set_birth(new_date)
-        else:
-            return set_birth(value)
+            value, result = fix_date(value)
+            if result is False:
+                return None
+        return set_birth(value)
+
+
+# TODO: <<<WRITE A DESCRIPTION HERE>>>
+def fix_date(value):
+    last_five = value[-5:]
+    test_number = int(last_five[:2])
+    if test_number <= 12:
+        new_date = '1900-' + last_five[:2] + '-' + value[-2:]
+    else:
+        new_date = '1900-' + value[-2:] + '-' + last_five[:2]
+    if is_valid_date(new_date):
+        return new_date, True
+    return value, False
 
 
 # TODO: <<<WRITE A DESCRIPTION HERE>>>
 def undupe_date(date1, date2):
     # TODO: TASK: TEST THIS BEFORE USE !!!!!!!
-    if is_valid_date(date1) or is_valid_date(date2):
+    date1fix = '1900-' + date1[-5:]
+    date2fix = '1900-' + date2[-5:]
+    if is_valid_date(date1fix) or is_valid_date(date2fix):
         if date1[-5:] == date2[-5:]:
             if get_num(date1[:2]) > 18:
                 print '\n\n'
