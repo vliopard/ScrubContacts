@@ -4,7 +4,7 @@
 
 It is still under development and this source code is provides just because it works while connecting to Google Contacts for retrieving contacts data and handle that. If you turn around you won't find it working in any other places because people are too lazy to explain that.
 
-##How it works:
+## How it works:
 This software would merge duplicated contacts by name, e-mail and phone number. It also provides features to batch rename contacts, format phones and e-mail addresses. There are many APIs you can use as you wish.
 
 ## How to install:
